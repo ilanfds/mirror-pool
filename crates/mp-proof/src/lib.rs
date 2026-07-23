@@ -11,6 +11,7 @@
 pub mod circuit;
 pub mod poseidon;
 pub mod proving;
+pub mod solana;
 
 pub use circuit::ProposeCircuit;
 pub use poseidon::PoseidonGadget;
