@@ -12,10 +12,12 @@ members = [
     "crates/mp-agent",
     "crates/mp-relayer",
     "crates/mp-keeper",
+    "programs/mirror_pool",
 ]
 
 [workspace.package]
 edition = "2021"
+rust-version = "1.89"
 license = "MIT"
 repository = "https://github.com/ilanfds/mirror-pool"
 
