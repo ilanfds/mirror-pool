@@ -96,6 +96,143 @@ pub mod mirror_pool {
         });
         Ok(())
     }
+
+    /// Open a new round in the `Propose` phase and set its slot windows.
+    pub fn open_round(
+        ctx: Context<OpenRound>,
+        round_id: u64,
+        propose_slots: u64,
+        commit_slots: u64,
+        execute_slots: u64,
+        threshold: u64,
+    ) -> Result<()> {
+        let clock = Clock::get()?;
+        let round = &mut ctx.accounts.round;
+        round.round_id = round_id;
+        round.bump = ctx.bumps.round;
+        round.phase = RoundPhase::Propose;
+        round.outcome = RoundOutcome::Pending;
+        round.action = [0u8; ACTION_LEN];
+        round.action_set = false;
+        round.proposal_count = 0;
+        round.commit_count = 0;
+        round.threshold = threshold;
+        round.propose_end_slot = clock.slot.saturating_add(propose_slots);
+        round.commit_end_slot = round.propose_end_slot.saturating_add(commit_slots);
+        round.execute_end_slot = round.commit_end_slot.saturating_add(execute_slots);
+        emit!(RoundOpened {
+            round_id,
+            threshold
+        });
+        Ok(())
+    }
+
+    /// Anonymously summon the round's action (Property A).
+    ///
+    /// The Groth16 membership/nullifier proof is verified here starting in phase
+    /// 4; for now the anti-double-propose guarantee comes entirely from the
+    /// nullifier marker PDA, whose `init` fails if the same nullifier is reused
+    /// in this round.
+    #[allow(unused_variables)]
+    pub fn propose(
+        ctx: Context<Propose>,
+        round_id: u64,
+        nullifier: [u8; 32],
+        action: [u8; ACTION_LEN],
+    ) -> Result<()> {
+        let clock = Clock::get()?;
+        let round = &mut ctx.accounts.round;
+        require!(
+            round.phase == RoundPhase::Propose,
+            MirrorPoolError::WrongPhase
+        );
+        require!(
+            clock.slot < round.propose_end_slot,
+            MirrorPoolError::WindowClosed
+        );
+        // TODO(phase 4): verify a Groth16 proof of membership in `pool` and of
+        // `nullifier = H(k, round_id)`, binding `action` as a public input.
+        if round.action_set {
+            require!(round.action == action, MirrorPoolError::ActionMismatch);
+        } else {
+            round.action = action;
+            round.action_set = true;
+        }
+        round.proposal_count = round.proposal_count.saturating_add(1);
+        Ok(())
+    }
+
+    /// Sign up to execute the round's action (Property B crowd commit).
+    ///
+    /// A skeleton counter for now; the binding pre-signed durable-nonce
+    /// transaction is held off-chain (DESIGN §6.5). The threshold is evaluated
+    /// on this count at the `Commit -> Execute` transition.
+    #[allow(unused_variables)]
+    pub fn commit(ctx: Context<UpdateRound>, round_id: u64) -> Result<()> {
+        let clock = Clock::get()?;
+        let round = &mut ctx.accounts.round;
+        require!(
+            round.phase == RoundPhase::Commit,
+            MirrorPoolError::WrongPhase
+        );
+        require!(
+            clock.slot < round.commit_end_slot,
+            MirrorPoolError::WindowClosed
+        );
+        round.commit_count = round.commit_count.saturating_add(1);
+        Ok(())
+    }
+
+    /// Advance the round to its next phase once the current window has elapsed:
+    /// seal (`Propose -> Commit`, aborting if no action was proposed), evaluate
+    /// the threshold (`Commit -> Execute` on GO, else abort), and finalize
+    /// (`Execute -> Closed`).
+    #[allow(unused_variables)]
+    pub fn advance_round(ctx: Context<UpdateRound>, round_id: u64) -> Result<()> {
+        let clock = Clock::get()?;
+        let round = &mut ctx.accounts.round;
+        match round.phase {
+            RoundPhase::Propose => {
+                require!(
+                    clock.slot >= round.propose_end_slot,
+                    MirrorPoolError::WindowOpen
+                );
+                if round.action_set {
+                    round.phase = RoundPhase::Commit;
+                } else {
+                    round.phase = RoundPhase::Closed;
+                    round.outcome = RoundOutcome::Abort;
+                }
+            }
+            RoundPhase::Commit => {
+                require!(
+                    clock.slot >= round.commit_end_slot,
+                    MirrorPoolError::WindowOpen
+                );
+                if round.commit_count >= round.threshold {
+                    round.phase = RoundPhase::Execute;
+                    round.outcome = RoundOutcome::Go;
+                } else {
+                    round.phase = RoundPhase::Closed;
+                    round.outcome = RoundOutcome::Abort;
+                }
+            }
+            RoundPhase::Execute => {
+                require!(
+                    clock.slot >= round.execute_end_slot,
+                    MirrorPoolError::WindowOpen
+                );
+                round.phase = RoundPhase::Closed;
+            }
+            RoundPhase::Closed => return err!(MirrorPoolError::RoundClosed),
+        }
+        emit!(RoundAdvanced {
+            round_id: round.round_id,
+            phase: round.phase,
+            outcome: round.outcome,
+        });
+        Ok(())
+    }
 }
 
 /// Two-input Poseidon over BN254 (`Bn254X5`, big-endian) via the Solana syscall.
@@ -163,10 +300,124 @@ pub struct DepositEvent {
     pub root: Fq,
 }
 
+/// Length of the (opaque, for now) sealed action payload.
+pub const ACTION_LEN: usize = 32;
+
+/// Persistent phases of a round (Seal and Threshold are transitions, not
+/// phases). See DESIGN §6.3.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RoundPhase {
+    Propose,
+    Commit,
+    Execute,
+    Closed,
+}
+
+/// Result of the threshold check (and whether the round produced cover).
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RoundOutcome {
+    Pending,
+    Go,
+    Abort,
+}
+
+/// A synchronized round: its phase, sealed action, tallies, and slot windows.
+#[account]
+pub struct Round {
+    pub round_id: u64,
+    pub bump: u8,
+    pub phase: RoundPhase,
+    pub outcome: RoundOutcome,
+    /// Sealed action the crowd rallies around (opaque until the vocabulary lands).
+    pub action: [u8; ACTION_LEN],
+    pub action_set: bool,
+    pub proposal_count: u64,
+    pub commit_count: u64,
+    pub threshold: u64,
+    pub propose_end_slot: u64,
+    pub commit_end_slot: u64,
+    pub execute_end_slot: u64,
+}
+
+impl Round {
+    /// Serialized size excluding the 8-byte discriminator. Enums are 1-byte
+    /// unit variants.
+    pub const SIZE: usize = 8 + 1 + 1 + 1 + ACTION_LEN + 1 + 8 + 8 + 8 + 8 + 8 + 8;
+}
+
+/// Zero-data marker; the existence of its PDA (seeds include the round id and
+/// the nullifier) means "this nullifier has been spent this round".
+#[account]
+pub struct NullifierMarker {}
+
+#[derive(Accounts)]
+#[instruction(round_id: u64)]
+pub struct OpenRound<'info> {
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + Round::SIZE,
+        seeds = [b"round", round_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub round: Account<'info, Round>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(round_id: u64, nullifier: [u8; 32])]
+pub struct Propose<'info> {
+    #[account(mut, seeds = [b"round", round_id.to_le_bytes().as_ref()], bump = round.bump)]
+    pub round: Account<'info, Round>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8,
+        seeds = [b"nullifier", round_id.to_le_bytes().as_ref(), nullifier.as_ref()],
+        bump
+    )]
+    pub nullifier_marker: Account<'info, NullifierMarker>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(round_id: u64)]
+pub struct UpdateRound<'info> {
+    #[account(mut, seeds = [b"round", round_id.to_le_bytes().as_ref()], bump = round.bump)]
+    pub round: Account<'info, Round>,
+}
+
+#[event]
+pub struct RoundOpened {
+    pub round_id: u64,
+    pub threshold: u64,
+}
+
+#[event]
+pub struct RoundAdvanced {
+    pub round_id: u64,
+    pub phase: RoundPhase,
+    pub outcome: RoundOutcome,
+}
+
 #[error_code]
 pub enum MirrorPoolError {
     #[msg("membership tree is full")]
     TreeFull,
     #[msg("poseidon syscall failed")]
     PoseidonFailed,
+    #[msg("instruction not valid in the round's current phase")]
+    WrongPhase,
+    #[msg("the phase window has already closed")]
+    WindowClosed,
+    #[msg("the phase window has not elapsed yet")]
+    WindowOpen,
+    #[msg("proposed action does not match the round's sealed action")]
+    ActionMismatch,
+    #[msg("round is already closed")]
+    RoundClosed,
 }
