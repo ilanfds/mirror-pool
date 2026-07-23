@@ -15,3 +15,11 @@ pub mod solana;
 
 pub use circuit::ProposeCircuit;
 pub use poseidon::PoseidonGadget;
+
+/// Tree height shared by the development circuit and the on-chain program
+/// (`mirror_pool::HEIGHT` must equal this).
+pub const TREE_HEIGHT: usize = 20;
+
+/// Seed for the **development** Groth16 setup. Dev keys only — production
+/// requires a trusted-setup ceremony (`docs/ROADMAP.md` §5).
+pub const DEV_SETUP_SEED: u64 = 20_240_723;

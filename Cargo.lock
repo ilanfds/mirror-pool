@@ -1857,8 +1857,12 @@ name = "mirror-pool-program"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "ark-std 0.5.0",
+ "groth16-solana",
  "litesvm",
  "mp-crypto",
+ "mp-proof",
+ "solana-compute-budget-interface",
  "solana-instruction",
  "solana-keypair",
  "solana-message",

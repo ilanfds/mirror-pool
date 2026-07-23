@@ -1,8 +1,8 @@
 //! mirror-pool on-chain program.
 //!
-//! ROADMAP phase 2: membership Merkle tree + deposit (this milestone), then the
-//! nullifier set and round state machine. The Groth16 proof check is stubbed
-//! until phase 4. See `docs/DESIGN.md` §6 and §11.
+//! Implements the membership Merkle tree + deposit, the round state machine, the
+//! nullifier set, and — in `propose` — on-chain Groth16 verification of the
+//! anonymous-proposal proof via `groth16-solana`. See `docs/DESIGN.md` §6, §11.
 //!
 //! Field elements are represented on-chain as **32-byte big-endian** limbs and
 //! hashed with the Solana Poseidon syscall (`Bn254X5`, big-endian). This matches
@@ -11,8 +11,11 @@
 //! the cross-check test asserts.
 
 use anchor_lang::prelude::*;
+use groth16_solana::groth16::Groth16Verifier;
 #[allow(deprecated)]
 use solana_poseidon::{hashv, Endianness, Parameters};
+
+mod vk;
 
 declare_id!("9D5M9HPLS2VMPXTQyg5V4WniTJpTDF73SVAFnUY3AtKJ");
 
@@ -129,29 +132,51 @@ pub mod mirror_pool {
 
     /// Anonymously summon the round's action (Property A).
     ///
-    /// The Groth16 membership/nullifier proof is verified here starting in phase
-    /// 4; for now the anti-double-propose guarantee comes entirely from the
-    /// nullifier marker PDA, whose `init` fails if the same nullifier is reused
-    /// in this round.
-    #[allow(unused_variables)]
+    /// Verifies a Groth16 proof of the `S_propose` statement (DESIGN §6.4): the
+    /// prover knows a membership note whose commitment sits under `root` and a
+    /// nullifier `= H(k, round_id)`, with `action` bound as a public input. The
+    /// proof reveals nothing about *which* member proposed. Replay is prevented
+    /// by the nullifier marker PDA (its `init` fails on reuse).
+    #[allow(clippy::too_many_arguments)]
     pub fn propose(
         ctx: Context<Propose>,
         round_id: u64,
         nullifier: [u8; 32],
         action: [u8; ACTION_LEN],
+        root: [u8; 32],
+        proof_a: [u8; 64],
+        proof_b: [u8; 128],
+        proof_c: [u8; 64],
     ) -> Result<()> {
         let clock = Clock::get()?;
-        let round = &mut ctx.accounts.round;
         require!(
-            round.phase == RoundPhase::Propose,
+            ctx.accounts.round.phase == RoundPhase::Propose,
             MirrorPoolError::WrongPhase
         );
         require!(
-            clock.slot < round.propose_end_slot,
+            clock.slot < ctx.accounts.round.propose_end_slot,
             MirrorPoolError::WindowClosed
         );
-        // TODO(phase 4): verify a Groth16 proof of membership in `pool` and of
-        // `nullifier = H(k, round_id)`, binding `action` as a public input.
+
+        // The proof must reference a real, recent membership root (not a tree of
+        // the prover's own making). Empty history slots are all-zero.
+        require!(
+            root != [0u8; 32] && ctx.accounts.pool.roots.contains(&root),
+            MirrorPoolError::UnknownRoot
+        );
+
+        // Public inputs, in the circuit's canonical order.
+        let public_inputs = [root, nullifier, round_id_to_input(round_id), action];
+        let verifying_key = vk::verifying_key();
+        let mut verifier =
+            Groth16Verifier::<4>::new(&proof_a, &proof_b, &proof_c, &public_inputs, &verifying_key)
+                .map_err(|_| error!(MirrorPoolError::ProofInvalid))?;
+        verifier
+            .verify()
+            .map_err(|_| error!(MirrorPoolError::ProofInvalid))?;
+
+        // Seal the action (first valid proposal sets it; later ones must match).
+        let round = &mut ctx.accounts.round;
         if round.action_set {
             require!(round.action == action, MirrorPoolError::ActionMismatch);
         } else {
@@ -241,6 +266,14 @@ fn poseidon2(a: &Fq, b: &Fq) -> Result<Fq> {
     let hash = hashv(Parameters::Bn254X5, Endianness::BigEndian, &[a, b])
         .map_err(|_| error!(MirrorPoolError::PoseidonFailed))?;
     Ok(hash.to_bytes())
+}
+
+/// Encode a `u64` round id as a 32-byte big-endian field element, matching the
+/// circuit's `round_id` public input (`Fr::from(round_id)`).
+fn round_id_to_input(round_id: u64) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    out[24..].copy_from_slice(&round_id.to_be_bytes());
+    out
 }
 
 /// The singleton pool: configuration plus the incremental membership tree.
@@ -369,6 +402,8 @@ pub struct OpenRound<'info> {
 #[derive(Accounts)]
 #[instruction(round_id: u64, nullifier: [u8; 32])]
 pub struct Propose<'info> {
+    #[account(seeds = [b"pool"], bump = pool.bump)]
+    pub pool: Box<Account<'info, Pool>>,
     #[account(mut, seeds = [b"round", round_id.to_le_bytes().as_ref()], bump = round.bump)]
     pub round: Account<'info, Round>,
     #[account(
@@ -420,4 +455,8 @@ pub enum MirrorPoolError {
     ActionMismatch,
     #[msg("round is already closed")]
     RoundClosed,
+    #[msg("proof references an unknown membership root")]
+    UnknownRoot,
+    #[msg("groth16 proof verification failed")]
+    ProofInvalid,
 }
