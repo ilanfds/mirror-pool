@@ -24,10 +24,14 @@ custom-panic = []
 [dependencies]
 anchor-lang = "1.1.2"
 solana-poseidon = "3"
+groth16-solana = "0.2"
 
 [dev-dependencies]
 mp-crypto = { path = "../../crates/mp-crypto" }
+mp-proof = { path = "../../crates/mp-proof" }
+ark-std = "0.5"
 litesvm = "0.10.0"
+solana-compute-budget-interface = "3.0.0"
 solana-message = "3.0.1"
 solana-transaction = "3.0.2"
 solana-signer = "3.0.0"
