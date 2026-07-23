@@ -1,0 +1,22 @@
+# Rust
+/target
+**/target
+
+# Anchor / Solana
+.anchor/
+test-ledger/
+**/*.so
+
+# Keypairs — NEVER commit secret keys
+*-keypair.json
+**/deploy/*-keypair.json
+
+# Node (TS tests, if any)
+node_modules/
+
+# Editor / OS
+.idea/
+.DS_Store
+
+# Local Claude config
+.claude/

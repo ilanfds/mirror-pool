@@ -1,0 +1,23 @@
+# mirror-pool workspace.
+#
+# The on-chain Anchor program (programs/mirror_pool) and the circuit crate
+# (circuits/propose) are added in their respective ROADMAP phases (2 and 3) to
+# keep early pure-Rust work free of anchor-lang <-> solana-client version churn.
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/mp-crypto",
+    "crates/mp-proof",
+    "crates/mp-agent",
+    "crates/mp-relayer",
+    "crates/mp-keeper",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/ilanfds/mirror-pool"
+
+[profile.release]
+overflow-checks = true
