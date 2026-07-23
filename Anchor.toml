@@ -1,0 +1,19 @@
+skip_local_validator = true
+
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+mirror_pool = "9D5M9HPLS2VMPXTQyg5V4WniTJpTDF73SVAFnUY3AtKJ"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test -p mirror-pool-program"
+
+[hooks]
