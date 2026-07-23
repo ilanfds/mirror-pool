@@ -1713,9 +1713,11 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "litesvm",
+ "mp-crypto",
  "solana-instruction",
  "solana-keypair",
  "solana-message",
+ "solana-poseidon",
  "solana-pubkey 3.0.0",
  "solana-signer",
  "solana-transaction",

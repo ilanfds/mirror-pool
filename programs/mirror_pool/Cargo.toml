@@ -23,8 +23,10 @@ custom-panic = []
 
 [dependencies]
 anchor-lang = "1.1.2"
+solana-poseidon = "3"
 
 [dev-dependencies]
+mp-crypto = { path = "../../crates/mp-crypto" }
 litesvm = "0.10.0"
 solana-message = "3.0.1"
 solana-transaction = "3.0.2"
