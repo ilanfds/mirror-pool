@@ -22,7 +22,7 @@ custom-heap = []
 custom-panic = []
 
 [dependencies]
-anchor-lang = "1.1.2"
+anchor-lang = { version = "1.1.2", features = ["init-if-needed"] }
 solana-poseidon = "3"
 groth16-solana = "0.2"
 

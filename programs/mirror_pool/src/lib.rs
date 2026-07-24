@@ -189,21 +189,29 @@ pub mod mirror_pool {
 
     /// Sign up to execute the round's action (Property B crowd commit).
     ///
-    /// A skeleton counter for now; the binding pre-signed durable-nonce
-    /// transaction is held off-chain (DESIGN §6.5). The threshold is evaluated
-    /// on this count at the `Commit -> Execute` transition.
+    /// Records the committer once per round — a marker PDA stops a single wallet
+    /// from inflating the count, so `commit_count` reflects *distinct*
+    /// participants — and grants a cover credit ("provide cover to get cover",
+    /// DESIGN §8). Committers act in the open, so crediting them leaks nothing
+    /// about the hidden initiator. The binding pre-signed durable-nonce
+    /// execution is held off-chain (DESIGN §6.5).
     #[allow(unused_variables)]
-    pub fn commit(ctx: Context<UpdateRound>, round_id: u64) -> Result<()> {
+    pub fn commit(ctx: Context<Commit>, round_id: u64) -> Result<()> {
         let clock = Clock::get()?;
-        let round = &mut ctx.accounts.round;
         require!(
-            round.phase == RoundPhase::Commit,
+            ctx.accounts.round.phase == RoundPhase::Commit,
             MirrorPoolError::WrongPhase
         );
         require!(
-            clock.slot < round.commit_end_slot,
+            clock.slot < ctx.accounts.round.commit_end_slot,
             MirrorPoolError::WindowClosed
         );
+
+        let credit = &mut ctx.accounts.credit;
+        credit.bump = ctx.bumps.credit;
+        credit.credits = credit.credits.saturating_add(1);
+
+        let round = &mut ctx.accounts.round;
         round.commit_count = round.commit_count.saturating_add(1);
         Ok(())
     }
@@ -383,6 +391,23 @@ impl Round {
 #[account]
 pub struct NullifierMarker {}
 
+/// A participant's cover-credit balance (`seeds = ["credit", owner]`). Earned by
+/// providing cover; the reputation half of the incentive layer (DESIGN §8).
+#[account]
+pub struct CreditAccount {
+    pub credits: u64,
+    pub bump: u8,
+}
+
+impl CreditAccount {
+    pub const SIZE: usize = 8 + 1;
+}
+
+/// Zero-data marker; its PDA existence (seeds include the round id and the
+/// committer) means "this wallet has already committed this round".
+#[account]
+pub struct CommitMarker {}
+
 #[derive(Accounts)]
 #[instruction(round_id: u64)]
 pub struct OpenRound<'info> {
@@ -416,6 +441,32 @@ pub struct Propose<'info> {
     pub nullifier_marker: Account<'info, NullifierMarker>,
     #[account(mut)]
     pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(round_id: u64)]
+pub struct Commit<'info> {
+    #[account(mut, seeds = [b"round", round_id.to_le_bytes().as_ref()], bump = round.bump)]
+    pub round: Account<'info, Round>,
+    #[account(
+        init_if_needed,
+        payer = committer,
+        space = 8 + CreditAccount::SIZE,
+        seeds = [b"credit", committer.key().as_ref()],
+        bump
+    )]
+    pub credit: Account<'info, CreditAccount>,
+    #[account(
+        init,
+        payer = committer,
+        space = 8,
+        seeds = [b"commit", round_id.to_le_bytes().as_ref(), committer.key().as_ref()],
+        bump
+    )]
+    pub commit_marker: Account<'info, CommitMarker>,
+    #[account(mut)]
+    pub committer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 

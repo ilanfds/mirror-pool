@@ -121,12 +121,39 @@ pub fn open_ix(payer: &Pubkey, round_id: u64, threshold: u64) -> Instruction {
     }
 }
 
-pub fn commit_ix(round_id: u64) -> Instruction {
+pub fn credit_pda(owner: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[b"credit", owner.as_ref()], &program_id()).0
+}
+
+pub fn commit_marker_pda(round_id: u64, owner: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[b"commit", round_id.to_le_bytes().as_ref(), owner.as_ref()],
+        &program_id(),
+    )
+    .0
+}
+
+pub fn commit_ix(round_id: u64, committer: &Pubkey) -> Instruction {
     Instruction {
         program_id: program_id(),
-        accounts: vec![AccountMeta::new(round_pda(round_id), false)],
+        accounts: vec![
+            AccountMeta::new(round_pda(round_id), false),
+            AccountMeta::new(credit_pda(committer), false),
+            AccountMeta::new(commit_marker_pda(round_id, committer), false),
+            AccountMeta::new(*committer, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
         data: mirror_pool::instruction::Commit { round_id }.data(),
     }
+}
+
+/// Cover-credit balance for `owner`, or `None` if the account doesn't exist yet.
+pub fn read_credit(svm: &LiteSVM, owner: &Pubkey) -> Option<u64> {
+    let acct = svm.get_account(&credit_pda(owner))?;
+    let mut d = acct.data.as_slice();
+    mirror_pool::CreditAccount::try_deserialize(&mut d)
+        .ok()
+        .map(|c| c.credits)
 }
 
 pub fn advance_ix(round_id: u64) -> Instruction {

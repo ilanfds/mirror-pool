@@ -35,7 +35,7 @@ fn lifecycle_reaches_go_and_closes() {
     // Three commits meet the threshold of 3.
     for _ in 0..3 {
         let c = fund(&mut svm);
-        assert!(send(&mut svm, &c, &[commit_ix(rid)]));
+        assert!(send(&mut svm, &c, &[commit_ix(rid, &c.pubkey())]));
     }
 
     // Threshold: Commit -> Execute (GO).
@@ -74,7 +74,7 @@ fn thin_crowd_aborts() {
     // Only two commits — below the threshold of 5.
     for _ in 0..2 {
         let c = fund(&mut svm);
-        assert!(send(&mut svm, &c, &[commit_ix(rid)]));
+        assert!(send(&mut svm, &c, &[commit_ix(rid, &c.pubkey())]));
     }
 
     let r = read_round(&svm, rid);
@@ -132,7 +132,7 @@ fn commit_in_propose_phase_is_rejected() {
     assert!(send(&mut svm, &payer, &[open_ix(&payer.pubkey(), rid, 1)]));
     // Still in Propose: committing is a wrong-phase error.
     let c = fund(&mut svm);
-    assert!(!send(&mut svm, &c, &[commit_ix(rid)]));
+    assert!(!send(&mut svm, &c, &[commit_ix(rid, &c.pubkey())]));
 }
 
 #[test]
