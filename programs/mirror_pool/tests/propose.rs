@@ -68,6 +68,56 @@ fn wrong_action_is_rejected() {
 }
 
 #[test]
+fn proof_cannot_replay_across_rounds() {
+    let Some(mut svm) = load() else { return };
+    let payer = fund(&mut svm);
+    assert!(init_pool(&mut svm, &payer));
+
+    // A proof built for round A binds round_id = A into its public inputs.
+    let rid_a = 300;
+    let rid_b = 301;
+    let mut proposal = deposit_and_prove(&mut svm, &payer, rid_a, 999);
+
+    // Open round B and retarget round A's proof at it.
+    assert!(send(
+        &mut svm,
+        &payer,
+        &[open_ix(&payer.pubkey(), rid_b, 1)]
+    ));
+    proposal.round_id = rid_b;
+
+    // The on-chain public inputs now carry round_id = B, which the proof does
+    // not attest to — verification must fail.
+    assert!(
+        !send_propose(&mut svm, &payer, &proposal),
+        "a proof must not replay into a different round"
+    );
+}
+
+#[test]
+fn propose_to_a_non_propose_round_is_rejected() {
+    let Some(mut svm) = load() else { return };
+    let payer = fund(&mut svm);
+    assert!(init_pool(&mut svm, &payer));
+    let rid = 302;
+
+    // Open a round and let it abort at seal (no proposal) -> Closed.
+    assert!(send(&mut svm, &payer, &[open_ix(&payer.pubkey(), rid, 1)]));
+    let r = read_round(&svm, rid);
+    svm.warp_to_slot(r.propose_end_slot);
+    let k = fund(&mut svm);
+    assert!(send(&mut svm, &k, &[advance_ix(rid)]));
+    assert_eq!(read_round(&svm, rid).phase, RoundPhase::Closed);
+
+    // A fresh, valid proposal is still rejected: the round isn't in Propose.
+    let proposal = deposit_and_prove(&mut svm, &payer, rid, 999);
+    assert!(
+        !send_propose(&mut svm, &payer, &proposal),
+        "proposing to a closed round must fail"
+    );
+}
+
+#[test]
 fn unknown_root_is_rejected() {
     let Some(mut svm) = load() else { return };
     let payer = fund(&mut svm);

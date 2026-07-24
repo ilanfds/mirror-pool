@@ -63,4 +63,18 @@ mod tests {
         assert_ne!(h, a);
         assert_ne!(h, b);
     }
+
+    #[test]
+    fn matches_circomlib_known_answer() {
+        // Anchor the whole hash stack to an external reference: circomlib's
+        // canonical Poseidon(2) of [1, 2]. If this holds, `light-poseidon`
+        // (and therefore the in-circuit gadget and the on-chain syscall, which
+        // are cross-checked against it) matches circomlib byte-for-byte.
+        use core::str::FromStr;
+        let expected = crate::field::F::from_str(
+            "7853200120776062878684798364095072458815029376092732009249414926327459813530",
+        )
+        .expect("valid field element");
+        assert_eq!(hash2(from_u64(1), from_u64(2)), expected);
+    }
 }
