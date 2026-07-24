@@ -54,14 +54,30 @@ participant's genuine intent.
 | Component | Status | Tests |
 |---|---|---|
 | **`mp-crypto`** — Poseidon, incremental Merkle tree, notes & nullifiers | ✅ | 18 |
-| **`programs/mirror_pool`** — membership tree, deposit, round state machine, nullifier set, **on-chain Groth16 verification** | ✅ | 13 |
+| **`programs/mirror_pool`** — membership tree, deposit, round state machine, nullifier set, **on-chain Groth16 verification**, cover credits | ✅ | 16 |
 | **`mp-proof`** — `S_propose` R1CS circuit, Groth16 proving, groth16-solana byte conversion | ✅ | 8 |
 | **`mp-agent`** — keystore, action policy, anonymous proposal builder + CLI | ✅ | 10 |
-| **`mp-relayer` / `mp-keeper`** — proposal submission & crowd synchronization | 🚧 scaffold | — |
-| Incentives, adversarial evaluation, ceremony | 📋 planned | — |
+| **`mp-relayer`** — trust-minimized propose transaction builder | ✅ | 4 |
+| **`mp-eval`** — adversarial evaluation (does it defeat chain-analysis?) | ✅ | 2 |
+| **`mp-keeper`** — crowd synchronization | 🚧 scaffold | — |
+| Monetary cover market, trusted-setup ceremony, keeper decentralization | 📋 planned | — |
 
-**49 tests**, CI-green (`fmt` + `clippy` + `test`). The anonymous-proposal loop
+**58 tests**, CI-green (`fmt` + `clippy` + `test`). The anonymous-proposal loop
 works **end to end**: deposit → off-chain proof → **on-chain verification**.
+
+### Does it actually defeat chain-analysis?
+
+We measure it. The **same** timing deanonymizer (name the earliest executor as
+the initiator) is run against copy-trading and against mirror-pool
+([`docs/ADVERSARIAL.md`](docs/ADVERSARIAL.md), `cargo run -p mp-eval`):
+
+| Behavior | Initiator-attribution accuracy |
+|---|---:|
+| Naive copy-trading | **1.0000** |
+| **mirror-pool** | **0.0198** (≈ `1/N`, i.e. random) |
+
+The heuristic that names the initiator every time under copy-trading collapses to
+random guessing under mirror-pool — a property guarded by a CI test.
 
 Highlights of the cryptographic core, each validated by a cross-check test:
 
@@ -81,13 +97,15 @@ crates/
   mp-crypto     Poseidon, incremental Merkle tree, notes & nullifiers   (pure Rust)
   mp-proof      S_propose circuit, Groth16 proving, on-chain byte format (arkworks)
   mp-agent      participant agent: keystore, policy, proposal builder + CLI
-  mp-relayer    trust-minimized proposal submitter        (scaffold)
+  mp-relayer    trust-minimized propose transaction builder
+  mp-eval       adversarial evaluation harness (timing attribution)
   mp-keeper     trust-minimized execution synchronizer     (scaffold)
 programs/
   mirror_pool   on-chain Anchor program (Groth16-verified propose)
 docs/
-  DESIGN.md     architecture / whitepaper
-  ROADMAP.md    phased implementation plan
+  DESIGN.md       architecture / whitepaper
+  ROADMAP.md      phased implementation plan
+  ADVERSARIAL.md  adversarial evaluation results
 ```
 
 ---

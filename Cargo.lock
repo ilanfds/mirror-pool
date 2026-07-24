@@ -2034,6 +2034,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mp-eval"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.7",
+]
+
+[[package]]
 name = "mp-keeper"
 version = "0.1.0"
 

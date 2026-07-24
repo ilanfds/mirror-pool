@@ -1,0 +1,18 @@
+[package]
+name = "mp-eval"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "mirror-pool adversarial evaluation: does the crowd actually defeat chain-analysis?"
+
+[lib]
+name = "mp_eval"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mp-eval"
+path = "src/main.rs"
+
+[dependencies]
+rand = "0.8"
