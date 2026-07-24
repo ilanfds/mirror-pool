@@ -6,4 +6,26 @@ license.workspace = true
 repository.workspace = true
 description = "mirror-pool trust-minimized proposal submitter"
 
+[lib]
+name = "mp_relayer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mp-relayer"
+path = "src/main.rs"
+
 [dependencies]
+mp-agent = { path = "../mp-agent" }
+solana-instruction = "3.0"
+solana-pubkey = { version = "3.0", features = ["curve25519"] }
+solana-transaction = { version = "3.0", features = ["bincode"] }
+solana-message = "3.0"
+solana-keypair = "3.0"
+solana-signer = "3.0"
+solana-hash = "3.0"
+solana-compute-budget-interface = "3.0"
+sha2 = "0.10"
+
+[dev-dependencies]
+mirror-pool-program = { path = "../../programs/mirror_pool" }
+anchor-lang = "1.1.2"

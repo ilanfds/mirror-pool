@@ -2058,6 +2058,20 @@ dependencies = [
 [[package]]
 name = "mp-relayer"
 version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "mirror-pool-program",
+ "mp-agent",
+ "sha2 0.10.9",
+ "solana-compute-budget-interface",
+ "solana-hash 3.1.0",
+ "solana-instruction",
+ "solana-keypair",
+ "solana-message",
+ "solana-pubkey 3.0.0",
+ "solana-signer",
+ "solana-transaction",
+]
 
 [[package]]
 name = "num"
