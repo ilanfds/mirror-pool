@@ -16,6 +16,9 @@ path = "src/main.rs"
 
 [dependencies]
 mp-crypto = { path = "../mp-crypto" }
+mp-proof = { path = "../mp-proof" }
+ark-bn254 = "0.5"
+ark-groth16 = "0.5"
 ark-std = "0.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -26,3 +29,4 @@ getrandom = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
+groth16-solana = "0.2"
