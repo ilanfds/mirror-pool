@@ -6,4 +6,23 @@ license.workspace = true
 repository.workspace = true
 description = "mirror-pool participant agent: keygen, durable-nonce pre-signing, round participation"
 
+[lib]
+name = "mp_agent"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mp-agent"
+path = "src/main.rs"
+
 [dependencies]
+mp-crypto = { path = "../mp-crypto" }
+ark-std = "0.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+getrandom = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
