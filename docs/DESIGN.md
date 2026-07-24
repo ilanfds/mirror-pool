@@ -133,8 +133,8 @@ Gating who may steer never gates who may hide.
 ## 4. Roles
 
 - **Pool program** — the on-chain Solana program. Holds the membership Merkle
-  tree, the nullifier set, per-round state, the injection-key commitment, and
-  the (optional) incentive pot. Verifies Groth16 proofs. Never holds operating
+  tree, the nullifier set, per-round state, cover-credit balances, and (optionally)
+  the injection-key commitment. Verifies Groth16 proofs. Never holds operating
   capital.
 - **Member / executor** — anyone who deposits a membership commitment. Runs an
   agent that participates in rounds and provides cover. Fully self-custodial.
@@ -158,7 +158,7 @@ custodian.
 - **Poseidon** (`H`) — a ZK-friendly hash over the BN254 scalar field, used for
   commitments, the Merkle tree, nullifiers, and the injection-key commitment.
   Rust: `light-poseidon`.
-- **Incremental Merkle tree** — fixed-height (e.g. 26) membership accumulator;
+- **Incremental Merkle tree** — fixed-height (20 in the current build) membership accumulator;
   the program stores a rolling history of the last *n* roots so proposals may
   reference any recent root (as in Tornado).
 - **Groth16 over BN254** — succinct proofs. Off-chain proving in Rust with
@@ -261,9 +261,16 @@ to the public inputs; *bonded mode* additionally proves membership in an
 injector accumulator.
 
 The program verifies the proof, checks that `nf` is unused for `round_id`
-(one proposal per member per round), validates `A` against the policy (§7.1),
-and appends `A` to the round's candidate set. The proposal is submitted **via a
+(one proposal per member per round), confirms `root` is a recent membership
+root, and seals `A` as the round's action. The proposal is submitted **via a
 relayer** so no known wallet is linked to the act of proposing.
+
+> **Implementation note.** In the current build the on-chain `action` is an
+> opaque field: the program binds and seals it but does not itself validate it
+> against the vocabulary. That enforcement is applied **off-chain** by the
+> participating agents — each executor only mirrors actions within a policy it
+> has accepted (`mp-agent`'s policy engine, §7.1). On-chain vocabulary
+> validation is a planned hardening.
 
 - By **default any member may propose** — one proposal per member per round,
   enforced by the nullifier. This maximizes initiator anonymity and keeps the
@@ -336,10 +343,15 @@ proposed**, not who proposes it:
   fixed-size notes. Non-standard amounts would deanonymize by size.
 - **Bounded rate** (max actions per round, cooldowns).
 
-A poison intent is thus *not expressable* and is rejected at the protocol level
-regardless of who submitted it. This defeats the malicious insider too — because
-even an authorized proposer cannot express a harmful action — and it lets the
-proposer set stay large, which *protects* initiator anonymity.
+A poison intent thus finds **no takers**: an executor only mirrors actions
+inside the vocabulary it opted into, so a harmful action fails to reach the
+threshold and the round aborts — defeating even a malicious insider, while
+keeping the proposer set large (which *protects* initiator anonymity).
+
+> **Where this is enforced.** In the current build the vocabulary is enforced
+> **off-chain** by the agents (`mp-agent`'s policy engine); the on-chain `action`
+> is opaque (§6.4). Lifting the policy on-chain — so the program itself rejects
+> out-of-vocabulary actions regardless of the agent — is a planned hardening.
 
 Bias the vocabulary toward **net-neutral / yield-bearing** actions (staking,
 LPing) so that providing cover costs little more than transaction fees (§8).
@@ -464,27 +476,24 @@ Everything is Rust, end to end, per the bounty constraint.
 ```
 mirror-pool/
 ├── programs/
-│   └── mirror_pool/        # on-chain program (Anchor or Pinocchio)
+│   └── mirror_pool/        # on-chain Anchor program:
 │       # membership tree, root history, nullifier set, round state machine,
-│       # Groth16 verification (groth16-solana / alt_bn128), incentive pot
-├── circuits/
-│   └── propose/            # R1CS proposal circuit (ark-relations / ark-r1cs-std)
-│       # + Groth16 setup, proving/verifying keys (dev keys; ceremony TODO)
+│       # Groth16 verification (groth16-solana / alt_bn128), cover credits
 ├── crates/
 │   ├── mp-crypto/          # Poseidon (light-poseidon), Merkle, note/nullifier
-│   ├── mp-proof/           # ark-groth16 proving; public-input encoding
-│   ├── mp-agent/           # participant: keygen, commit, durable-nonce presign,
-│   │                       #   round watcher, execution, policy engine
+│   ├── mp-proof/           # S_propose R1CS circuit + ark-groth16 proving
+│   │                       #   + groth16-solana byte conversion (dev keys)
+│   ├── mp-agent/           # participant: keystore, policy engine, proposal builder
 │   ├── mp-relayer/         # proposal relayer (trust-minimized)
-│   └── mp-keeper/          # execution broadcaster / synchronizer
-└── docs/
-    └── DESIGN.md           # this document
+│   ├── mp-keeper/          # durable-nonce pre-signing + batched execution
+│   └── mp-eval/            # adversarial evaluation harness
+└── docs/                   # DESIGN.md, ROADMAP.md, ADVERSARIAL.md
 ```
 
 **On-chain (Rust program):** membership Merkle tree + rolling root history;
 per-round nullifier set; round state machine (`Propose→Seal→Commit→Threshold→
-Execute→Close`); Groth16 verifier; optional injection-governance state (`H_s` /
-injector accumulator); incentive pot accounting. Never holds operating capital.
+Execute→Close`); Groth16 verifier; cover-credit accounting (the monetary cover
+pot is planned). Never holds operating capital.
 
 **Off-chain (Rust):** proof generation (`ark-groth16`), agent orchestration
 (`tokio`, `solana-client`), durable-nonce management, policy validation,
