@@ -35,13 +35,19 @@ pub struct Scenario {
     pub crowd_size: usize,
     pub window: f64,
     pub mode: Mode,
+    /// If set, this "power initiator" starts half of all rounds (the rest are
+    /// random) — a persistent bias a cross-round adversary can try to exploit.
+    pub frequent_initiator: Option<usize>,
 }
 
 impl Scenario {
     /// Simulate one round.
     pub fn simulate_round<R: Rng>(&self, rng: &mut R) -> Round {
         let n = self.crowd_size;
-        let initiator = rng.gen_range(0..n);
+        let initiator = match self.frequent_initiator {
+            Some(w) if w < n && rng.gen_bool(0.5) => w,
+            _ => rng.gen_range(0..n),
+        };
         let mut executions = Vec::with_capacity(n);
 
         match self.mode {

@@ -7,12 +7,16 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
 
 jobs:
+  # Fast, toolchain-light checks over the whole workspace. The on-chain program
+  # tests compile here but skip at runtime (no built .so); they run for real in
+  # the `program` job below.
   check:
     name: fmt · clippy · test
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-D warnings"
     steps:
       - uses: actions/checkout@v4
 
@@ -32,3 +36,32 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+  # Builds the Anchor program to BPF and runs the LiteSVM on-chain tests (the
+  # cross-check, round lifecycle, Groth16 verification, incentives, and the
+  # replay/phase guards).
+  program:
+    name: on-chain program (anchor build + litesvm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Solana CLI (Agave)
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor CLI
+        run: cargo install --locked --version 1.1.2 anchor-cli
+
+      - name: Build program (BPF)
+        run: anchor build
+
+      - name: Test program
+        run: cargo test -p mirror-pool-program

@@ -25,6 +25,8 @@ in which it names the true initiator — against the `1/N` random-guess baseline
 
 Crowd size `N = 50`, `5000` rounds. Random-guess baseline is `1/N = 0.0200`.
 
+**Per-round adversary** (earliest-executor):
+
 | Behavior | Attribution accuracy |
 |---|---:|
 | Naive copy-trading | **1.0000** |
@@ -34,6 +36,19 @@ The identical heuristic that names the initiator **100%** of the time under
 copy-trading drops to **~`1/N`** — statistically indistinguishable from random
 guessing — under mirror-pool. The ordering signal that leaks the initiator is
 erased by the uniform, synchronized jitter.
+
+**Cross-round adversary** (most-frequently-earliest), against a persistent
+*power initiator* who starts half the rounds — the kind of signal a longitudinal
+analyst hunts:
+
+| Behavior | Power-initiator hit rate |
+|---|---:|
+| Naive copy-trading | **0.5116** |
+| **mirror-pool** | **0.0138** |
+
+Under copy-trading the analyst extracts the power initiator (they are earliest
+whenever they act); under mirror-pool the same longitudinal attack collapses to
+random. Two different, reasonable adversaries — not one strawman — both fail.
 
 ## Reproduce
 

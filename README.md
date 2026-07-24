@@ -53,16 +53,16 @@ participant's genuine intent.
 
 | Component | Status | Tests |
 |---|---|---|
-| **`mp-crypto`** — Poseidon, incremental Merkle tree, notes & nullifiers | ✅ | 18 |
-| **`programs/mirror_pool`** — membership tree, deposit, round state machine, nullifier set, **on-chain Groth16 verification**, cover credits | ✅ | 16 |
+| **`mp-crypto`** — Poseidon (circomlib-KAT verified), incremental Merkle tree, notes & nullifiers | ✅ | 19 |
+| **`programs/mirror_pool`** — membership tree, deposit, round state machine, nullifier set, **on-chain Groth16 verification**, cover credits | ✅ | 20 |
 | **`mp-proof`** — `S_propose` R1CS circuit, Groth16 proving, groth16-solana byte conversion | ✅ | 8 |
 | **`mp-agent`** — keystore, action policy, anonymous proposal builder + CLI | ✅ | 10 |
 | **`mp-relayer`** — trust-minimized propose transaction builder | ✅ | 4 |
-| **`mp-eval`** — adversarial evaluation (does it defeat chain-analysis?) | ✅ | 2 |
+| **`mp-eval`** — adversarial evaluation (does it defeat chain-analysis?) | ✅ | 3 |
 | **`mp-keeper`** — durable-nonce pre-signing + batched execution | ✅ | 3 |
 | Monetary cover market, trusted-setup ceremony, keeper decentralization, live RPC | 📋 planned | — |
 
-**61 tests**, CI-green (`fmt` + `clippy` + `test`). The anonymous-proposal loop
+**67 tests**, CI-green (`fmt` + `clippy` + `test`). The anonymous-proposal loop
 works **end to end**: deposit → off-chain proof → **on-chain verification**.
 
 ### Does it actually defeat chain-analysis?
@@ -77,7 +77,10 @@ the initiator) is run against copy-trading and against mirror-pool
 | **mirror-pool** | **0.0198** (≈ `1/N`, i.e. random) |
 
 The heuristic that names the initiator every time under copy-trading collapses to
-random guessing under mirror-pool — a property guarded by a CI test.
+random guessing under mirror-pool. A **second, cross-round** adversary (that
+extracts a persistent power-initiator, 0.51 hit-rate under copy-trading) also
+collapses to random (0.01) under mirror-pool — two reasonable attacks, not one
+strawman. Both are guarded by CI tests.
 
 Highlights of the cryptographic core, each validated by a cross-check test:
 

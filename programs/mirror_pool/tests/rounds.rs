@@ -147,3 +147,33 @@ fn advance_before_window_is_rejected() {
     let k = fund(&mut svm);
     assert!(!send(&mut svm, &k, &[advance_ix(rid)]));
 }
+
+#[test]
+fn pool_cannot_be_reinitialized() {
+    let Some(mut svm) = load() else { return };
+    let payer = fund(&mut svm);
+    assert!(init_pool(&mut svm, &payer));
+    // Re-initializing the singleton pool must fail: the PDA already exists.
+    let other = fund(&mut svm);
+    assert!(!init_pool(&mut svm, &other));
+}
+
+#[test]
+fn advancing_a_closed_round_is_rejected() {
+    let Some(mut svm) = load() else { return };
+    let payer = fund(&mut svm);
+    let rid = 7;
+    assert!(init_pool(&mut svm, &payer));
+    assert!(send(&mut svm, &payer, &[open_ix(&payer.pubkey(), rid, 1)]));
+
+    // Abort at seal (no proposal) -> Closed.
+    let r = read_round(&svm, rid);
+    svm.warp_to_slot(r.propose_end_slot);
+    let k = fund(&mut svm);
+    assert!(send(&mut svm, &k, &[advance_ix(rid)]));
+    assert_eq!(read_round(&svm, rid).phase, RoundPhase::Closed);
+
+    // Advancing a terminal round must fail.
+    let k2 = fund(&mut svm);
+    assert!(!send(&mut svm, &k2, &[advance_ix(rid)]));
+}

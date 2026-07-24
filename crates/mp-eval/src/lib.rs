@@ -19,5 +19,5 @@ pub mod metrics;
 pub mod scenario;
 
 pub use adversary::{Attributor, EarliestExecutor};
-pub use metrics::attribution_accuracy;
+pub use metrics::{attribution_accuracy, longitudinal_earliest_accuracy};
 pub use scenario::{Execution, Mode, Round, Scenario};
