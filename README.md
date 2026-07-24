@@ -59,10 +59,10 @@ participant's genuine intent.
 | **`mp-agent`** — keystore, action policy, anonymous proposal builder + CLI | ✅ | 10 |
 | **`mp-relayer`** — trust-minimized propose transaction builder | ✅ | 4 |
 | **`mp-eval`** — adversarial evaluation (does it defeat chain-analysis?) | ✅ | 2 |
-| **`mp-keeper`** — crowd synchronization | 🚧 scaffold | — |
-| Monetary cover market, trusted-setup ceremony, keeper decentralization | 📋 planned | — |
+| **`mp-keeper`** — durable-nonce pre-signing + batched execution | ✅ | 3 |
+| Monetary cover market, trusted-setup ceremony, keeper decentralization, live RPC | 📋 planned | — |
 
-**58 tests**, CI-green (`fmt` + `clippy` + `test`). The anonymous-proposal loop
+**61 tests**, CI-green (`fmt` + `clippy` + `test`). The anonymous-proposal loop
 works **end to end**: deposit → off-chain proof → **on-chain verification**.
 
 ### Does it actually defeat chain-analysis?
@@ -99,7 +99,7 @@ crates/
   mp-agent      participant agent: keystore, policy, proposal builder + CLI
   mp-relayer    trust-minimized propose transaction builder
   mp-eval       adversarial evaluation harness (timing attribution)
-  mp-keeper     trust-minimized execution synchronizer     (scaffold)
+  mp-keeper     durable-nonce pre-signing + batched execution
 programs/
   mirror_pool   on-chain Anchor program (Groth16-verified propose)
 docs/

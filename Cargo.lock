@@ -2043,6 +2043,19 @@ dependencies = [
 [[package]]
 name = "mp-keeper"
 version = "0.1.0"
+dependencies = [
+ "bincode",
+ "litesvm",
+ "solana-hash 3.1.0",
+ "solana-instruction",
+ "solana-keypair",
+ "solana-message",
+ "solana-nonce",
+ "solana-pubkey 3.0.0",
+ "solana-signer",
+ "solana-system-interface 3.2.0",
+ "solana-transaction",
+]
 
 [[package]]
 name = "mp-proof"
