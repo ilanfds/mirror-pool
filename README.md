@@ -23,8 +23,7 @@ who originated a behavioral pattern*. Non-custodial, written entirely in Rust,
 with the zero-knowledge proof **verified on-chain** through Solana's
 `alt_bn128` syscalls.
 
-> 📄 **Read the whitepaper:** [`docs/mirror-pool.pdf`](docs/mirror-pool.pdf)
-> (source in [`docs/whitepaper/`](docs/whitepaper/)).
+> 📄 **Read the whitepaper:** [`docs/mirror-pool.pdf`](docs/mirror-pool.pdf).
 
 > ⚠️ **Experimental.** Ships with development trusted-setup keys. Not for
 > production until the release gates in [`docs/ROADMAP.md`](docs/ROADMAP.md) §5
@@ -125,7 +124,6 @@ docs/
   DESIGN.md         architecture / detailed spec
   ROADMAP.md        phased implementation plan
   ADVERSARIAL.md    adversarial evaluation results
-  whitepaper/       LaTeX source
 ```
 
 ---
@@ -156,12 +154,6 @@ Regenerate the development verifying key (after any circuit change):
 ```bash
 cargo run -p mp-proof --example gen_vk > programs/mirror_pool/src/vk.rs
 cargo fmt --all
-```
-
-Build the whitepaper PDF (any full LaTeX install, or `tectonic`):
-
-```bash
-tectonic docs/whitepaper/mirror-pool.tex
 ```
 
 ---

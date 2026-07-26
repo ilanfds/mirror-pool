@@ -21,11 +21,5 @@ node_modules/
 # Local Claude config
 .claude/
 
-# LaTeX build artifacts and the local tectonic binary (keep the .tex source)
-docs/whitepaper/tectonic
-docs/whitepaper/*.aux
-docs/whitepaper/*.log
-docs/whitepaper/*.out
-docs/whitepaper/*.toc
-docs/whitepaper/*.pdf
-docs/whitepaper/missfont.log
+# Whitepaper LaTeX source + build dir — only the compiled docs/mirror-pool.pdf is tracked
+/docs/whitepaper
