@@ -3,17 +3,28 @@
 **A synchronized behavioral mixer for Solana — a crowd-sourced anonymity set for
 *behavior*, not funds.**
 
-On a public ledger every action is legible and increasingly fed into AI-powered
-analytics that cluster wallets and front-run intent. mirror-pool makes *behavior*
-collectively deniable: many independent wallets perform the **same standardized
-action inside the same synchronized time window**, so an observer can see *that*
-an action happened but not *which participant genuinely wanted it* nor *who
-summoned the crowd*.
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange)
+![On-chain](https://img.shields.io/badge/Solana-Anchor%20%2B%20Groth16-14F195)
+![Tests](https://img.shields.io/badge/tests-67%20passing-brightgreen)
+
+On a public ledger every action is legible, and the graph it forms is
+increasingly read by AI-powered analytics that cluster wallets, attribute
+identities, and front-run intent in real time. Most privacy tools hide *funds*.
+mirror-pool hides *behavior*: many independent wallets perform the **same
+standardized action inside the same synchronized time window**, so an observer
+sees *that* an action happened — and even which wallets performed it — but cannot
+tell **which participant genuinely wanted it**, nor **who caused the crowd to
+assemble**.
 
 It ports the Tornado Cash architecture — commitments, a Merkle membership set,
 nullifiers, and relayers — from *hiding which deposit is withdrawn* to *hiding
-who originated a behavioral pattern*. Non-custodial, in Rust, with zero-knowledge
-proofs **verified on-chain**.
+who originated a behavioral pattern*. Non-custodial, written entirely in Rust,
+with the zero-knowledge proof **verified on-chain** through Solana's
+`alt_bn128` syscalls.
+
+> 📄 **Read the whitepaper:** [`docs/mirror-pool.pdf`](docs/mirror-pool.pdf)
+> (source in [`docs/whitepaper/`](docs/whitepaper/)).
 
 > ⚠️ **Experimental.** Ships with development trusted-setup keys. Not for
 > production until the release gates in [`docs/ROADMAP.md`](docs/ROADMAP.md) §5
@@ -21,14 +32,15 @@ proofs **verified on-chain**.
 
 ---
 
-## The idea in one picture
+## The idea
 
 Two independent anonymities compose (see [`docs/DESIGN.md`](docs/DESIGN.md) §3):
 
 - **Initiator anonymity** — who *summoned* the round's action is hidden by a
-  zero-knowledge membership proof.
-- **Intent anonymity** — which of the many wallets *genuinely wanted* the action
-  is hidden by the uniform, synchronized crowd (free).
+  zero-knowledge membership proof, submitted through a relayer so no wallet even
+  pays for the proposal.
+- **Intent anonymity** — which of the many executing wallets *genuinely wanted*
+  the action is hidden by the uniform, synchronized crowd. This one is free.
 
 ```mermaid
 flowchart TD
@@ -36,7 +48,7 @@ flowchart TD
     B --> C{Round}
     C -->|Propose| D[Anonymous ZK proof<br/>verified on-chain]
     D -->|Seal| E[Action frozen]
-    E -->|Commit| F[Crowd signs up]
+    E -->|Commit| F[Crowd signs up<br/>durable-nonce pre-signed txs]
     F -->|Threshold N reached?| G{GO / ABORT}
     G -->|GO| H[Everyone executes the same<br/>action in one window]
     G -->|ABORT| I[Nobody executes<br/>no one is exposed]
@@ -45,51 +57,54 @@ flowchart TD
 
 The initiator's proof reveals only a per-round nullifier `H(k, round_id)` — never
 *which* member proposed. The crowd's uniform execution buries any single
-participant's genuine intent.
+participant's genuine intent. Nothing is custodial: every action runs on the
+participant's own wallet against the real protocol.
+
+---
+
+## Does it actually defeat chain-analysis?
+
+We measure it, rather than assert it. The **same** timing deanonymizer is run
+against copy-trading and against mirror-pool
+([`docs/ADVERSARIAL.md`](docs/ADVERSARIAL.md), `cargo run -p mp-eval`). With a
+crowd of `N = 50`, random guessing scores `1/N = 0.02`:
+
+| Adversary | Copy-trading | mirror-pool |
+|---|---:|---:|
+| Earliest-executor (per round) | **1.0000** | **0.0198** |
+| Most-frequently-earliest (cross-round, power initiator) | **0.5116** | **0.0138** |
+
+Two reasonable attacks — one per-round, one longitudinal — both identify the
+initiator under copy-trading and both collapse to random guessing under
+mirror-pool. The ordering signal they rely on is erased by the synchronized
+jitter. Both properties are guarded by CI tests that fail if attribution ever
+climbs back up.
 
 ---
 
 ## What's implemented
 
 | Component | Status | Tests |
-|---|---|---|
+|---|:---:|:---:|
 | **`mp-crypto`** — Poseidon (circomlib-KAT verified), incremental Merkle tree, notes & nullifiers | ✅ | 19 |
 | **`programs/mirror_pool`** — membership tree, deposit, round state machine, nullifier set, **on-chain Groth16 verification**, cover credits | ✅ | 20 |
-| **`mp-proof`** — `S_propose` R1CS circuit, Groth16 proving, groth16-solana byte conversion | ✅ | 8 |
+| **`mp-proof`** — `S_propose` R1CS circuit, Groth16 proving, `groth16-solana` byte conversion | ✅ | 8 |
 | **`mp-agent`** — keystore, action policy, anonymous proposal builder + CLI | ✅ | 10 |
 | **`mp-relayer`** — trust-minimized propose transaction builder | ✅ | 4 |
-| **`mp-eval`** — adversarial evaluation (does it defeat chain-analysis?) | ✅ | 3 |
 | **`mp-keeper`** — durable-nonce pre-signing + batched execution | ✅ | 3 |
+| **`mp-eval`** — adversarial evaluation harness | ✅ | 3 |
 | Monetary cover market, trusted-setup ceremony, keeper decentralization, live RPC | 📋 planned | — |
 
-**67 tests**, CI-green (`fmt` + `clippy` + `test`). The anonymous-proposal loop
-works **end to end**: deposit → off-chain proof → **on-chain verification**.
+**67 tests**, CI-green (`fmt` + `clippy` + `test`, plus an on-chain job that
+builds the program and runs the LiteSVM suite). The anonymous-proposal loop works
+**end to end**: deposit → off-chain proof → **on-chain verification**.
 
-### Does it actually defeat chain-analysis?
-
-We measure it. The **same** timing deanonymizer (name the earliest executor as
-the initiator) is run against copy-trading and against mirror-pool
-([`docs/ADVERSARIAL.md`](docs/ADVERSARIAL.md), `cargo run -p mp-eval`):
-
-| Behavior | Initiator-attribution accuracy |
-|---|---:|
-| Naive copy-trading | **1.0000** |
-| **mirror-pool** | **0.0198** (≈ `1/N`, i.e. random) |
-
-The heuristic that names the initiator every time under copy-trading collapses to
-random guessing under mirror-pool. A **second, cross-round** adversary (that
-extracts a persistent power-initiator, 0.51 hit-rate under copy-trading) also
-collapses to random (0.01) under mirror-pool — two reasonable attacks, not one
-strawman. Both are guarded by CI tests.
-
-Highlights of the cryptographic core, each validated by a cross-check test:
-
-- the **on-chain** Poseidon (Solana syscall) reproduces the **off-chain** hash
-  (`light-poseidon`) byte-for-byte;
-- the **in-circuit** Poseidon gadget matches both (it reuses `light-poseidon`'s
-  exact constants);
-- the arkworks→`groth16-solana` proof/VK byte format is verified against
-  `groth16-solana`'s own verifier.
+Three properties in the cryptographic core are each pinned by a cross-check:
+the **on-chain** Poseidon (Solana syscall) reproduces the **off-chain** hash
+(`light-poseidon`) byte-for-byte; the **in-circuit** Poseidon gadget matches both
+and is anchored to circomlib by a known-answer test; and the arkworks →
+`groth16-solana` proof/VK byte format is verified against `groth16-solana`'s own
+verifier before it ever reaches the chain.
 
 ---
 
@@ -101,34 +116,36 @@ crates/
   mp-proof      S_propose circuit, Groth16 proving, on-chain byte format (arkworks)
   mp-agent      participant agent: keystore, policy, proposal builder + CLI
   mp-relayer    trust-minimized propose transaction builder
-  mp-eval       adversarial evaluation harness (timing attribution)
   mp-keeper     durable-nonce pre-signing + batched execution
+  mp-eval       adversarial evaluation harness (timing attribution)
 programs/
   mirror_pool   on-chain Anchor program (Groth16-verified propose)
 docs/
-  DESIGN.md       architecture / whitepaper
-  ROADMAP.md      phased implementation plan
-  ADVERSARIAL.md  adversarial evaluation results
+  mirror-pool.pdf   the whitepaper
+  DESIGN.md         architecture / detailed spec
+  ROADMAP.md        phased implementation plan
+  ADVERSARIAL.md    adversarial evaluation results
+  whitepaper/       LaTeX source
 ```
 
 ---
 
 ## Build & test
 
-**Prerequisites:** Rust (stable), and for the on-chain program the Solana CLI
+**Prerequisites:** Rust (stable). For the on-chain program, the Solana CLI
 (Agave 3.1.x) and Anchor 1.1.2.
 
 The pure-Rust crates need only Rust:
 
 ```bash
-cargo test -p mp-crypto -p mp-proof -p mp-agent
+cargo test -p mp-crypto -p mp-proof -p mp-agent -p mp-relayer -p mp-keeper -p mp-eval
 ```
 
 The on-chain program is built with Anchor, then tested against LiteSVM:
 
 ```bash
 anchor build                          # produces target/deploy/mirror_pool.so
-cargo test -p mirror-pool-program     # cross-check, round lifecycle, on-chain verify
+cargo test -p mirror-pool-program     # cross-check, round lifecycle, on-chain verify, ...
 ```
 
 `cargo test --workspace` runs everything; the program tests skip gracefully if
@@ -139,6 +156,12 @@ Regenerate the development verifying key (after any circuit change):
 ```bash
 cargo run -p mp-proof --example gen_vk > programs/mirror_pool/src/vk.rs
 cargo fmt --all
+```
+
+Build the whitepaper PDF (any full LaTeX install, or `tectonic`):
+
+```bash
+tectonic docs/whitepaper/mirror-pool.tex
 ```
 
 ---
@@ -156,8 +179,19 @@ cargo run -p mp-agent -- commitment --keystore note.json
 cargo run -p mp-agent -- policy
 ```
 
-The agent's `build_proposal` (library) turns a note + a tree snapshot into the
+The agent's `build_proposal` (library) turns a note plus a tree snapshot into the
 exact arguments the on-chain `propose` instruction verifies.
+
+---
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [**Whitepaper**](docs/mirror-pool.pdf) | the solution, end to end, in paper form |
+| [DESIGN.md](docs/DESIGN.md) | detailed spec: threat model, the two anonymities, round lifecycle, circuit, incentives, security analysis |
+| [ROADMAP.md](docs/ROADMAP.md) | phased implementation plan and release gates |
+| [ADVERSARIAL.md](docs/ADVERSARIAL.md) | the chain-analysis evaluation and its method |
 
 ---
 
@@ -167,14 +201,12 @@ exact arguments the on-chain `propose` instruction verifies.
   their own wallets against real protocols. mirror-pool coordinates *timing and
   uniformity*, never money.
 - **Not a fund mixer.** It hides the *behavioral pattern*, not the funds
-  themselves — that is a different tool (see `docs/DESIGN.md` §1.4).
+  themselves — a different tool's job (see `docs/DESIGN.md` §1.4).
+- **Membership is public**, exactly as in Tornado Cash: what is hidden is the
+  link between membership and *origination*, not the fact of joining.
 - **Development keys.** The embedded verifying key comes from a single-party
   setup. A multi-party ceremony, an audit, and keeper decentralization are
   tracked as release gates (`docs/ROADMAP.md` §5).
-
-See [`docs/DESIGN.md`](docs/DESIGN.md) for the threat model, anonymity analysis,
-and open research problems, and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the
-phased plan.
 
 ## License
 
