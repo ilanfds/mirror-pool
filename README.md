@@ -26,8 +26,8 @@ with the zero-knowledge proof **verified on-chain** through Solana's
 > 📄 **Read the whitepaper:** [`docs/mirror-pool.pdf`](docs/mirror-pool.pdf).
 
 > ⚠️ **Experimental.** Ships with development trusted-setup keys. Not for
-> production until the release gates in [`docs/ROADMAP.md`](docs/ROADMAP.md) §5
-> are met (a trusted-setup ceremony, an audit, and keeper decentralization).
+> production until the release gates are met: a trusted-setup ceremony, an audit,
+> and keeper decentralization.
 
 ---
 
@@ -122,7 +122,6 @@ programs/
 docs/
   mirror-pool.pdf   the whitepaper
   DESIGN.md         architecture / detailed spec
-  ROADMAP.md        phased implementation plan
   ADVERSARIAL.md    adversarial evaluation results
 ```
 
@@ -182,7 +181,6 @@ exact arguments the on-chain `propose` instruction verifies.
 |---|---|
 | [**Whitepaper**](docs/mirror-pool.pdf) | the solution, end to end, in paper form |
 | [DESIGN.md](docs/DESIGN.md) | detailed spec: threat model, the two anonymities, round lifecycle, circuit, incentives, security analysis |
-| [ROADMAP.md](docs/ROADMAP.md) | phased implementation plan and release gates |
 | [ADVERSARIAL.md](docs/ADVERSARIAL.md) | the chain-analysis evaluation and its method |
 
 ---
@@ -198,7 +196,7 @@ exact arguments the on-chain `propose` instruction verifies.
   link between membership and *origination*, not the fact of joining.
 - **Development keys.** The embedded verifying key comes from a single-party
   setup. A multi-party ceremony, an audit, and keeper decentralization are
-  tracked as release gates (`docs/ROADMAP.md` §5).
+  tracked as release gates.
 
 ## License
 

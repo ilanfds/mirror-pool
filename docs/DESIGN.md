@@ -490,7 +490,7 @@ mirror-pool/
 │   ├── mp-relayer/         # proposal relayer (trust-minimized)
 │   ├── mp-keeper/          # durable-nonce pre-signing + batched execution
 │   └── mp-eval/            # adversarial evaluation harness
-└── docs/                   # DESIGN.md, ROADMAP.md, ADVERSARIAL.md
+└── docs/                   # DESIGN.md, ADVERSARIAL.md, and the whitepaper (mirror-pool.pdf)
 ```
 
 **On-chain (Rust program):** membership Merkle tree + rolling root history;

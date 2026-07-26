@@ -23,3 +23,6 @@ node_modules/
 
 # Whitepaper LaTeX source + build dir — only the compiled docs/mirror-pool.pdf is tracked
 /docs/whitepaper
+
+# Development-support doc — kept local, not exposed in the repo
+/docs/ROADMAP.md
