@@ -222,8 +222,11 @@ Rounds are instances of an **action template** at a **fixed denomination**
 2. **Seal.** The round's action and parameters are **frozen**. This must precede
    Commit, because participants pre-sign the exact transaction.
 3. **Commit.** Each participant pre-signs the exact execution transaction using
-   a durable nonce and registers an anonymous commit; the public commit counter
-   increments (§6.4, §6.5).
+   a durable nonce and registers a **per-wallet** commit — once per round (a
+   marker PDA prevents double-counting) and earning a cover credit (§8). The
+   committer signs openly; since cover-providers act in the open (§9), this
+   reveals nothing about the hidden initiator. The public commit counter
+   increments (§6.5).
 4. **Threshold.** If `commits ≥ N`, the program marks the round `GO`; otherwise
    `ABORT`. This is enforced **collectively**.
 5. **Execute.** Only on `GO`: every committed participant's pre-signed
