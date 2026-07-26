@@ -170,10 +170,15 @@ custodian.
   enabling "sign once at commit, broadcast later" without standing delegation
   (§6.4).
 
-> **Trusted setup.** Groth16 requires a per-circuit trusted setup. Production
-> deployment requires a multi-party (Powers-of-Tau style) ceremony; this repo
-> ships a *development* proving/verifying key and documents the ceremony as a
-> release blocker. This is called out honestly rather than hidden.
+> **Trusted setup.** Groth16 — like every proof system cheap enough to verify
+> on-chain — is parameterized by a one-time per-circuit setup. The prototype
+> ships a *development* key from a single-party setup, so it carries that
+> assumption in its weakest form; reaching mainnet is the standard multi-party
+> (Powers-of-Tau style) ceremony that Zcash and Tornado Cash ran — a routine
+> operational step that swaps the embedded verifying key without touching the
+> protocol, the circuit, or the verifier. Its scope is narrow: it bears on the
+> soundness of the membership gate, not on the anonymity (which does not depend
+> on it) or on funds (the protocol is non-custodial).
 
 ### 5.1 Notation
 
@@ -463,9 +468,10 @@ lie:
   deep prize.
 - **Decentralized, censorship-resistant keepers/relayers.** A committee,
   threshold-signed, or MEV-style competitive market for broadcasting rounds.
-- **Trusted-setup ceremony.** A real Powers-of-Tau MPC for the proposal circuit,
-  or migration to a transparent-setup proof system whose on-chain verification
-  stays affordable on Solana.
+- **Trusted-setup ceremony.** Not research but standard production hardening: a
+  multi-party Powers-of-Tau ceremony for the proposal circuit, of the kind Zcash
+  and Tornado Cash ran. (A transparent-setup proof system would remove it
+  entirely, at the cost of heavier on-chain verification.)
 - **Adaptive, adversary-aware scheduling.** Choosing denominations, round
   cadence, and vocabulary to maximize measured resistance against concrete
   clustering/copy-trade models, rather than naive randomness.
