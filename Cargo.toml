@@ -13,6 +13,7 @@ members = [
     "crates/mp-relayer",
     "crates/mp-keeper",
     "crates/mp-eval",
+    "crates/mp-trace",
     "programs/mirror_pool",
 ]
 

@@ -81,6 +81,28 @@ climbs back up.
 
 ---
 
+## Is the crowd real? The anonymity ruler
+
+A pool's advertised anonymity — `k`, the number of members — is usually a lie,
+because *where each member's funds came from* is public too. Group members by
+funding source and the crowd shrinks: wallets funded from the same exchange
+withdrawal are correlated, and one funder behind most of the pool leaves a victim
+nearly alone. mirror-pool ships a **protocol-agnostic ruler** that scores the gap
+(`cargo run -p mp-trace -- demo`):
+
+| Metric | Value |
+|---|---:|
+| advertised `k` | 30 |
+| effective-k (Shannon) | **6.12** |
+| effective-k (min-entropy, worst case) | **2.14** |
+| self-fill floor (largest funder adversarial) | 16 |
+
+You never trust the advertised number — you measure it. The ruler scores any
+pool (mirror-pool's own included) and reports the **self-fill floor**: the cover
+that survives when a whale or Sybil funds many of the slots.
+
+---
+
 ## What's implemented
 
 | Component | Status | Tests |
@@ -92,9 +114,10 @@ climbs back up.
 | **`mp-relayer`** — trust-minimized propose transaction builder | ✅ | 4 |
 | **`mp-keeper`** — durable-nonce pre-signing + batched execution | ✅ | 3 |
 | **`mp-eval`** — adversarial evaluation harness | ✅ | 3 |
+| **`mp-trace`** — anonymity ruler (advertised vs effective `k`) | ✅ | 4 |
 | Monetary cover market, trusted-setup ceremony, keeper decentralization, live RPC | 📋 planned | — |
 
-**67 tests**, CI-green (`fmt` + `clippy` + `test`, plus an on-chain job that
+**71 tests**, CI-green (`fmt` + `clippy` + `test`, plus an on-chain job that
 builds the program and runs the LiteSVM suite). The anonymous-proposal loop works
 **end to end**: deposit → off-chain proof → **on-chain verification**.
 
@@ -117,6 +140,7 @@ crates/
   mp-relayer    trust-minimized propose transaction builder
   mp-keeper     durable-nonce pre-signing + batched execution
   mp-eval       adversarial evaluation harness (timing attribution)
+  mp-trace      anonymity ruler (advertised vs effective k)
 programs/
   mirror_pool   on-chain Anchor program (Groth16-verified propose)
 docs/

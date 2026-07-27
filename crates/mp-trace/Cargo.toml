@@ -1,0 +1,21 @@
+[package]
+name = "mp-trace"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "mirror-pool anonymity ruler: advertised k vs the effective-k a funding-graph adversary leaves"
+
+[lib]
+name = "mp_trace"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mp-trace"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
